@@ -1,0 +1,211 @@
+import * as XLSX from 'xlsx';
+
+const fileInput = document.querySelector('#excelFile');
+const demoBtn = document.querySelector('#demoBtn');
+const searchInput = document.querySelector('#searchInput');
+const statsGrid = document.querySelector('#statsGrid');
+const tableBody = document.querySelector('#peopleTableBody');
+
+let currentData = [];
+
+const demoData = [
+  ['نام', 'تاریخ', 'وضعیت'],
+  ['علی', '2026-10-01', 'حاضر'],
+  ['علی', '2026-10-02', 'غایب'],
+  ['علی', '2026-10-03', 'حاضر'],
+  ['علی', '2026-10-04', 'حاضر'],
+  ['علی', '2026-10-05', 'غایب'],
+  ['سارا', '2026-10-01', 'حاضر'],
+  ['سارا', '2026-10-02', 'حاضر'],
+  ['سارا', '2026-10-03', 'غایب'],
+  ['سارا', '2026-10-04', 'حاضر'],
+  ['سارا', '2026-10-05', 'حاضر'],
+  ['مهدی', '2026-10-01', 'غایب'],
+  ['مهدی', '2026-10-02', 'حاضر'],
+  ['مهدی', '2026-10-03', 'حاضر'],
+  ['مهدی', '2026-10-04', 'غایب'],
+  ['مهدی', '2026-10-05', 'حاضر'],
+  ['نرگس', '2026-10-01', 'حاضر'],
+  ['نرگس', '2026-10-02', 'حاضر'],
+  ['نرگس', '2026-10-03', 'حاضر'],
+  ['نرگس', '2026-10-04', 'غایب'],
+  ['نرگس', '2026-10-05', 'حاضر']
+];
+
+function normalizeText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+}
+
+function isPresentStatus(value) {
+  const text = normalizeText(value);
+  const presentKeywords = ['حاضر', 'present', 'presented', 'attended', 'پذیرش', 'came'];
+  const absentKeywords = ['غایب', 'absent', 'missed', 'not present', 'غائب', 'idle'];
+
+  if (presentKeywords.some((keyword) => text.includes(keyword))) return 'present';
+  if (absentKeywords.some((keyword) => text.includes(keyword))) return 'absent';
+
+  if (['1', 'y', 'yes', 'true', 'on'].includes(text)) return 'present';
+  if (['0', 'n', 'no', 'false', 'off'].includes(text)) return 'absent';
+
+  return 'unknown';
+}
+
+function getHeaderName(row) {
+  return Object.keys(row).reduce((acc, key) => {
+    const normalized = normalizeText(key);
+    if (normalized.includes('نام') || normalized.includes('name')) return key;
+    if (normalized.includes('تاریخ') || normalized.includes('date')) return key;
+    if (normalized.includes('وضعیت') || normalized.includes('status') || normalized.includes('attendance') || normalized.includes('حضور')) return key;
+    if (normalized.includes('employee') || normalized.includes('person')) return key;
+    return acc;
+  }, '');
+}
+
+function parseWorkbook(workbook) {
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
+
+  if (!rows.length) {
+    throw new Error('هیچ داده‌ای در فایل پیدا نشد.');
+  }
+
+  const candidateHeaders = rows[0];
+  const nameKey = Object.keys(candidateHeaders).find((key) => {
+    const normalized = normalizeText(key);
+    return normalized.includes('نام') || normalized.includes('name') || normalized.includes('employee') || normalized.includes('person');
+  });
+
+  const dateKey = Object.keys(candidateHeaders).find((key) => {
+    const normalized = normalizeText(key);
+    return normalized.includes('تاریخ') || normalized.includes('date');
+  });
+
+  const statusKey = Object.keys(candidateHeaders).find((key) => {
+    const normalized = normalizeText(key);
+    return normalized.includes('وضعیت') || normalized.includes('status') || normalized.includes('attendance') || normalized.includes('حضور');
+  });
+
+  if (!nameKey || !dateKey || !statusKey) {
+    throw new Error('فایل اکسل باید شامل ستون‌های نام، تاریخ و وضعیت باشد.');
+  }
+
+  return rows.map((row) => ({
+    name: row[nameKey],
+    date: row[dateKey],
+    status: row[statusKey]
+  }));
+}
+
+function buildSummary(data) {
+  const people = new Map();
+
+  data.forEach(({ name, status }) => {
+    const cleanName = String(name ?? '').trim();
+    if (!cleanName) return;
+
+    const record = people.get(cleanName) || { name: cleanName, present: 0, absent: 0, total: 0 };
+    const normalizedStatus = isPresentStatus(status);
+
+    if (normalizedStatus === 'present') record.present += 1;
+    if (normalizedStatus === 'absent') record.absent += 1;
+    if (normalizedStatus !== 'unknown') record.total += 1;
+
+    people.set(cleanName, record);
+  });
+
+  return Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+}
+
+function renderStats(summary) {
+  const totalPeople = summary.length;
+  const totalPresent = summary.reduce((sum, item) => sum + item.present, 0);
+  const totalAbsent = summary.reduce((sum, item) => sum + item.absent, 0);
+
+  const cards = [
+    { label: 'تعداد افراد', value: totalPeople, type: 'total', icon: '👥' },
+    { label: 'تعداد حضور', value: totalPresent, type: 'present', icon: '✅' },
+    { label: 'تعداد غیبت', value: totalAbsent, type: 'absent', icon: '❌' }
+  ];
+
+  statsGrid.innerHTML = cards
+    .map(
+      (card) => `
+        <article class="stat-card ${card.type}">
+          <div class="label">
+            <span>${card.label}</span>
+            <span class="icon">${card.icon}</span>
+          </div>
+          <p class="value">${card.value}</p>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function renderTable(summary, filter) {
+  const query = normalizeText(filter);
+
+  const filtered = summary.filter((item) => item.name.toLowerCase().includes(query));
+
+  if (!filtered.length) {
+    tableBody.innerHTML = '<tr><td colspan="4" class="empty-state">هیچ نتیجه‌ای پیدا نشد.</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = filtered
+    .map(
+      (item) => `
+        <tr>
+          <td>${item.name}</td>
+          <td>${item.present}</td>
+          <td>${item.absent}</td>
+          <td>${item.total}</td>
+        </tr>
+      `
+    )
+    .join('');
+}
+
+function renderDashboard(data) {
+  const summary = buildSummary(data);
+  renderStats(summary);
+  renderTable(summary, searchInput.value);
+}
+
+function handleFileUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    try {
+      const workbook = XLSX.read(e.target.result, { type: 'array' });
+      const parsed = parseWorkbook(workbook);
+      currentData = parsed;
+      renderDashboard(currentData);
+    } catch (error) {
+      alert(error.message || 'خطا در خواندن فایل اکسل');
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+function loadDemoData() {
+  const ws = XLSX.utils.aoa_to_sheet(demoData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'حضور و غیاب');
+  const parsed = parseWorkbook(wb);
+  currentData = parsed;
+  renderDashboard(currentData);
+}
+
+searchInput.addEventListener('input', () => {
+  renderTable(buildSummary(currentData), searchInput.value);
+});
+
+fileInput.addEventListener('change', handleFileUpload);
+demoBtn.addEventListener('click', loadDemoData);
+
+loadDemoData();
