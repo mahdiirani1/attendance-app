@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>سیستم حضور و غیاب</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">سامانه</p>
+          <h1>حضور و غیاب</h1>
+        </div>
+        <div class="actions">
+          <button id="demoBtn" class="secondary">داده نمونه</button>
+          <label class="upload-btn">
+            <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
+            انتخاب فایل اکسل
+          </label>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="toolbar">
+          <div class="search-box">
+            <label for="searchInput">جستجو</label>
+            <input id="searchInput" type="text" placeholder="نام فرد را جستجو کنید..." />
+          </div>
+        </section>
+
+        <section class="stats-grid" id="statsGrid"></section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>خلاصه‌ی افراد</h2>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>نام</th>
+                  <th>تعداد روزهای حضور</th>
+                  <th>تعداد روزهای غیبت</th>
+                  <th>جمع روزها</th>
+                </tr>
+              </thead>
+              <tbody id="peopleTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
